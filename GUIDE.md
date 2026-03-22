@@ -54,6 +54,15 @@ openclaw gateway stop
 openclaw gateway restart
 ```
 
+**Plugins:**
+```bash
+openclaw plugins list                    # List installed plugins
+openclaw plugins install <package>       # Install a plugin
+openclaw plugins uninstall <package>      # Remove a plugin
+openclaw plugins update <package>        # Update a plugin
+```
+After installing a plugin, restart the gateway: `openclaw gateway restart`
+
 **General:**
 ```bash
 openclaw status    # your current status
@@ -167,6 +176,45 @@ Curated highlights. Periodically review your daily notes and promote important s
 - **Be bold internally** (reading files, running commands, searching, organizing)
 - **Respect privacy.** You have access to personal stuff. Don't leak it.
 - **In group chats, don't dominate.** Only speak when you add value.
+
+---
+
+## Essential Plugins
+
+### Lossless-Claw (Highly Recommended)
+
+This plugin replaces OpenClaw's default message truncation with a DAG-based summarization system. Instead of losing old messages when the context window fills up, it:
+- Stores every message in SQLite
+- Summarizes older chunks into compressed nodes
+- Builds a tree of summaries you can drill into later
+- Gives you tools to search and recall details from compacted history
+
+**Install:**
+```bash
+openclaw plugins install @martian-engineering/lossless-claw
+openclaw gateway restart
+```
+
+**Tools it adds:**
+- `lcm_grep` — Search compacted conversation history using regex or full-text search
+- `lcm_describe` — Look up metadata and content for a summary by ID
+- `lcm_expand` — Drill into summaries to recover original detail
+- `lcm_expand_query` — Answer focused questions using delegated expansion
+
+**Environment variables (optional):**
+```bash
+LCM_DATABASE_PATH=~/.openclaw/lcm.db        # Where to store the LCM database
+LCM_CONTEXT_THRESHOLD=0.75                  # Trigger compaction at 75% of context
+LCM_FRESH_TAIL_COUNT=32                    # Protect last 32 messages from compaction
+LCM_SUMMARY_MODEL=claude-3-5-haiku         # Model for summarization (cheaper = faster)
+LCM_IGNORE_SESSION_PATTERNS=agent:*:cron:** # Skip LCM for cron sessions
+```
+
+**Usage tips:**
+- After installing, LCM automatically starts managing your conversation history
+- You can query old conversations even after they've been compacted
+- It's perfect for long-running projects where you need to recall decisions from weeks ago
+- The database lives at `~/.openclaw/lcm.db` — you can back it up like any SQLite file
 
 ---
 
