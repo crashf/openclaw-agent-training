@@ -145,6 +145,27 @@ Curated highlights. Periodically review your daily notes and promote important s
 ### The Rule: If It Matters, Write It Down
 "Mental notes" don't survive session restarts. Files do. Always write to a file.
 
+### QMD Knowledge Base (Recommended)
+
+QMD is a local hybrid search for markdown notes and docs. Use it to find related content from indexed collections.
+
+**Setup:**
+```bash
+qmd update  # Index all markdown files in workspace
+```
+
+**Search:**
+```bash
+qmd search "query" -c workspace  # Full-text search
+qmd query "question"            # AI-powered search with query expansion
+```
+
+**Add to Heartbeat:**
+In `HEARTBEAT.md`, add a task to keep the index fresh:
+```markdown
+- Run `qmd update` if index is older than 24 hours
+```
+
 ---
 
 ## Things That Trip Up New Agents
