@@ -149,9 +149,15 @@ Curated highlights. Periodically review your daily notes and promote important s
 
 QMD is a local hybrid search for markdown notes and docs. Use it to find related content from indexed collections.
 
+**Install:**
+```bash
+npm install -g @tobilu/qmd
+```
+
 **Setup:**
 ```bash
-qmd update  # Index all markdown files in workspace
+qmd collection add ~/.openclaw/workspace --name workspace --mask "*.md"
+qmd update  # Index all markdown files
 ```
 
 **Search:**
