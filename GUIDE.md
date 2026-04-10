@@ -46,6 +46,8 @@ Schedule format is standard cron: `minute hour day month weekday`
 - `0 8 * * 1` = Mondays at 8am
 - `*/30 * * * *` = every 30 minutes
 
+**Important:** User times are in their local timezone. **Always convert to UTC when scheduling cron jobs** — EDT = UTC-4, EST = UTC-5. Never assume a time is UTC unless explicitly stated.
+
 **Gateway:**
 ```bash
 openclaw gateway status
@@ -98,7 +100,7 @@ Before asking "how do I do this?" — try to figure it out:
 
 ### Common Requests and What to Do
 
-**"Set a reminder"** → Use `openclaw cron add`
+**"Set a reminder"** → Use `openclaw cron add`. Remember: user times are local (EDT/EST), convert to UTC for scheduling.
 
 **"What time is it?" / "What's today's date?"** → Run `date` or check session_status
 
@@ -118,6 +120,73 @@ Before asking "how do I do this?" — try to figure it out:
 
 ---
 
+## Advanced Patterns
+
+### Model Management Rules (Critical)
+- **Always use the specific model the user selects** — change 100% immediately when they switch
+- **Build sub-agents ALWAYS use the default/production model** — planning/discussion can use any model, but when spawning sub-agents to build code, always set the model explicitly (e.g., `model: minimax-m2.5`)
+- Never revert to a different model without explicit user instruction
+
+### Sub-Agent Spawn Rules
+- When spawning persistent sub-agents (`mode: "session"`), match the runtime platform (e.g., `thread: true` for Discord)
+- Use `runtime: "acp"` for coding harnesses, `runtime: "subagent"` for isolated tasks
+- Don't route ACP harness requests through PTY exec flows — use `sessions_spawn` directly
+
+### SSH Authentication Resilience
+- **Try ALL auth methods before giving up**: SSH key → password → alternate passwords → different users
+- Store host details in TOOLS.md the *first* time you learn them
+- Shell variables don't expand inside Python/quoted strings via SSH — pipe the file or use different approaches
+
+### Skill-First Architecture
+- **Always check for a skill first** before building from scratch or using raw commands
+- Skills live in `~/.openclaw/workspace/skills/` → list them to see what's available
+- Mandatory skills exist for specific domains — always reference the skill first before direct API calls
+
+### n8n API Patterns
+- **Never use typeVersion 2.x for If nodes** when building via API — they save correctly but render blank in the UI (use typeVersion 1 with `conditions.boolean` format)
+- **Never edit n8n's SQLite database directly** — always use the REST API
+- Credentials and API keys: store in `.secrets/`, reference through environment or skill
+
+### Reverse Proxy Standard
+- Use Nginx Proxy Manager (or your org's standard) for ALL subdomain proxying
+- Consistent pattern: SSL termination, reverse proxy, Let's Encrypt certs
+
+### Credential Hygiene
+- Store all API keys, tokens, and passwords in `.secrets/` directory
+- Never hardcode credentials in scripts or conversation
+- Reference credentials through the skill system or environment variables
+
+---
+
+## LLM Wiki Pattern (Knowledge Persistence)
+
+Store institutional knowledge in a maintainable wiki instead of losing it to context windows:
+
+### Setup
+- **Pattern** (Karpathy-style): `raw/` (sources) → `wiki/` (compiled markdown) → `index.md` + qmd search
+- **Unlike RAG**: Knowledge is compiled once, cross-referenced, and kept current — synthesis happens at write-time, not retrieval-time
+- **Three workflows**: Ingest (source → wiki), Query (search → synthesize with citations), Lint (health check for orphans/stale pages)
+
+### Keeping It Current
+- **Ingest after significant work**: Debugging sessions, architectural decisions, completed features — anything you'd want to remember in 3 months
+- **Heartbeat tasks** (add to `HEARTBEAT.md`):
+  - Check if `wiki/log.md` has today's entry — if not, ingest recent work NOW
+  - Run `qmd update` if index is older than 24 hours
+  - Weekly lint: check for contradictions, orphaned pages, missing links
+  - Monthly review: promote important daily notes to long-term memory, prune stale content
+- **Query Protocol**: When answering questions about past projects or decisions, *search the wiki first* before guessing or asking
+
+### Scheduled Upkeep (Example Cron)
+```bash
+# Daily: sync index and ingest if needed
+openclaw cron add --schedule "0 */6 * * *" --message "Check wiki index freshness and ingest today's work if needed"
+
+# Weekly: lint and reconcile
+openclaw cron add --schedule "0 9 * * 1" --message "Weekly wiki lint: check for orphans, stale content, and promote significant learnings to MEMORY.md"
+```
+
+---
+
 ## Heartbeats
 
 You'll periodically receive a heartbeat message. This is OpenClaw checking in with you. 
@@ -129,6 +198,10 @@ You can use heartbeats for proactive work:
 - Check for new messages/notifications
 - Update memory files
 - Do background maintenance
+
+**Heartbeat vs Cron:**
+- **Use heartbeat when:** Multiple checks can batch together, you need conversational context from recent messages, timing can drift slightly (~30 min), you want to reduce API calls
+- **Use cron when:** Exact timing matters, task needs isolation from main session history, you want a different model or thinking level, one-shot reminders, output should deliver directly to a channel
 
 Don't spam your human during heartbeats. Only reach out if something actually needs their attention.
 
@@ -202,7 +275,7 @@ In `HEARTBEAT.md`, add a task to keep the index fresh:
 - **Ask before doing anything external** (sending emails, posting publicly, etc.)
 - **Be bold internally** (reading files, running commands, searching, organizing)
 - **Respect privacy.** You have access to personal stuff. Don't leak it.
-- **In group chats, don't dominate.** Only speak when you add value.
+- **In group chats, don't dominate.** Only speak when you add value. Use reactions (👍, ✅, 💀) as lightweight social signals instead of one-word replies.
 
 ---
 
@@ -258,6 +331,8 @@ LCM_IGNORE_SESSION_PATTERNS=agent:*:cron:** # Skip LCM for cron sessions
 | Check gateway status | `openclaw gateway status` |
 | See your skills | `ls ~/.openclaw/workspace/skills/` |
 | Check the date/time | `date` or `session_status` |
+| Search my wiki | `qmd query "question"` or `qmd search "term"` |
+| Spawn a build sub-agent | `sessions_spawn` with explicit model param |
 
 ---
 
