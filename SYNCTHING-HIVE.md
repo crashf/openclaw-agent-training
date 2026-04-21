@@ -8,7 +8,7 @@ You are joining the Pund-IT Company Brain — a shared memory system that syncs 
 
 ## What You Need to Know
 
-- **Hub** is the central sync relay at `170.205.18.11`
+- **Hub** is the central sync relay at `170.205.18.11` (device ID: `HLBW742-2EYCQ7X-NC5MNKM-R4NBAMH-2XMBND4-G7MX7KX-QKBUMM7-DRDINAQ`, name: `hino-wiki-sync`)
 - **Folder ID** is `memory` — all agents use this exact ID
 - **Your sync path** is `/root/.openclaw/workspace/memory/` (native) or `/var/syncthing/memory` (Docker)
 - **Shared knowledge** lives in `memory/synthesis/`, `memory/index.md`, `memory/log.md`, and daily notes
@@ -98,103 +98,83 @@ Replace `YOUR_DEVICE_ID` with the ID from Step 3. Replace `YOUR_HOSTNAME` with y
 ### If Running Syncthing Natively (most agents):
 
 ```bash
-cat > ~/.config/syncthing/config.xml << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<configuration version="40">
-  <gui enabled="true" tls="false" bind-address="127.0.0.1" port="8384">
+cat > ~/.config/syncthing/config.xml << 'EOFXML'
+<configuration version="37">
+  <folder id="memory" label="Company Brain" path="/root/.openclaw/workspace/memory" type="sendreceive" rescanIntervalS="3600" fsWatcherEnabled="true" fsWatcherDelayS="10" fsWatcherTimeoutS="0" ignorePerms="false" autoNormalize="true">
+    <filesystemType>basic</filesystemType>
+    <device id="YOUR_DEVICE_ID" introducedBy="">
+      <encryptionPassword></encryptionPassword>
+    </device>
+    <device id="HLBW742-2EYCQ7X-NC5MNKM-R4NBAMH-2XMBND4-G7MX7KX-QKBUMM7-DRDINAQ" introducedBy="">
+      <encryptionPassword></encryptionPassword>
+    </device>
+    <minDiskFree unit="%">1</minDiskFree>
+    <versioning>
+      <cleanupIntervalS>3600</cleanupIntervalS>
+      <fsPath></fsPath>
+      <fsType>basic</fsType>
+    </versioning>
+    <copiers>0</copiers>
+    <pullerMaxPendingKiB>0</pullerMaxPendingKiB>
+    <hashers>0</hashers>
+    <order>random</order>
+    <ignoreDelete>false</ignoreDelete>
+    <scanProgressIntervalS>0</scanProgressIntervalS>
+    <pullerPauseS>0</pullerPauseS>
+    <maxConflicts>10</maxConflicts>
+    <disableSparseFiles>false</disableSparseFiles>
+    <paused>false</paused>
+    <markerName>.stfolder</markerName>
+  </folder>
+  <device id="YOUR_DEVICE_ID" name="YOUR_HOSTNAME" compression="metadata" introducer="false" skipIntroductionRemovals="false" introducedBy="">
+    <address>dynamic</address>
+    <paused>false</paused>
+    <autoAcceptFolders>false</autoAcceptFolders>
+  </device>
+  <device id="HLBW742-2EYCQ7X-NC5MNKM-R4NBAMH-2XMBND4-G7MX7KX-QKBUMM7-DRDINAQ" name="hino-wiki-sync" compression="metadata" introducer="false" skipIntroductionRemovals="false" introducedBy="">
+    <address>dynamic</address>
+    <paused>false</paused>
+    <autoAcceptFolders>false</autoAcceptFolders>
+  </device>
+  <gui enabled="true" tls="false" debugging="false" sendBasicAuthPrompt="false">
     <address>127.0.0.1:8384</address>
+    <theme>default</theme>
   </gui>
   <options>
-    <deviceAddresses>
-      <address>dynamic</address>
-    </deviceAddresses>
-    <relays>
-      <address>relays://relays.syncthing.net:22067</address>
-      <address>relay://47.244.91.78:22067</address>
-    </relays>
-    <maxConns>0</maxConns>
-    <unackingNotificationLimit>0</unackingNotificationLimit>
+    <listenAddress>default</listenAddress>
+    <globalAnnounceEnabled>true</globalAnnounceEnabled>
+    <localAnnounceEnabled>true</localAnnounceEnabled>
+    <relaysEnabled>true</relaysEnabled>
   </options>
-  <device id="YOUR_DEVICE_ID" name="YOUR_HOSTNAME" compression="metadata" relayServerEnabled="false" customCertDHE="" introducer="false" bypassGateway="true">
-    <address>170.205.18.11</address>
-  </device>
-  <folder id="memory" label="memory" path="/root/.openclaw/workspace/memory/" type="sendreceive" rescanIntervalS="30" fsWatcherEnabled="true" fsWatcherDelayS="3" ignorePerms="false" autoNormalize="true">
-    <device id="YOUR_DEVICE_ID" introducedBy="">
-      <encryption password=""/>
-    </device>
-    <device id="REPLACED_BY_HUB" introducedBy="">
-      <encryption password=""/>
-    </device>
-    <minDiskFree unit="1">1</minDiskFree>
-    <maxConflicts>-1</maxConflicts>
-    <fsync>true</fsync>
-    <ignoreDelete>false</ignoreDelete>
-    <ignoreUpdateSaveFile>false</ignoreUpdateSaveFile>
-    <ignoreUpdateSaveDirFile>false</ignoreUpdateSaveDirFile>
-    <ignoreUpdateSaveReaddir>false</ignoreUpdateSaveReaddir>
-    <ignoreUpdateSaveVersioner=false</ignoreUpdateSaveVersioner>
-    <copiers>0</copiers>
-    <pullerMaxPendingKiB">0</pullerMaxPendingKiB>
-    <hashers>0</hashers>
-    <autoDefrag="true" />
-    <sendOwnCert="true" />
-    <syncOwnershipReadOnly="false" />
-    <syncOwnership="true" />
-    <syncGroupReadOnly="false" />
-    <syncGroup="true" />
-  </folder>
 </configuration>
-EOF
+EOFXML
 ```
 
-### If Running Inside Docker (some agents):
+### If Running Syncthing in Docker:
+
+> ⚠️ **CRITICAL:** The folder path MUST be `/var/syncthing/memory` — NOT `/root/.openclaw/workspace/memory`. Inside the container, the host directory is mounted at `/var/syncthing/memory`. If you use the host path, sync will fail with "folder path missing" and get stuck at ~47%. This is the #1 Docker gotcha.
 
 ```bash
-cat > ~/.config/syncthing/config.xml << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<configuration version="40">
-  <gui enabled="true" tls="false" bind-address="127.0.0.1" port="8384">
-    <address>127.0.0.1:8384</address>
-  </gui>
-  <options>
-    <deviceAddresses>
-      <address>dynamic</address>
-    </deviceAddresses>
-    <relays>
-      <address>relays://relays.syncthing.net:22067</address>
-      <address>relay://47.244.91.78:22067</address>
-    </relays>
-    <maxConns>0</maxConns>
-    <unackingNotificationLimit>0</unackingNotificationLimit>
-  </options>
-  <device id="YOUR_DEVICE_ID" name="YOUR_HOSTNAME" compression="metadata" relayServerEnabled="false" customCertDHE="" introducer="false" bypassGateway="true">
-    <address>170.205.18.11</address>
-  </device>
-  <folder id="memory" label="memory" path="/var/syncthing/memory" type="sendreceive" rescanIntervalS="30" fsWatcherEnabled="true" fsWatcherDelayS="3" ignorePerms="false" autoNormalize="true">
-    <device id="YOUR_DEVICE_ID" introducedBy="">
-      <encryption password=""/>
-    </device>
-    <device id="REPLACED_BY_HUB" introducedBy="">
-      <encryption password=""/>
-    </device>
-    <minDiskFree unit="1">1</minDiskFree>
-    <maxConflicts>-1</maxConflicts>
-    <fsync>true</fsync>
-    <copiers>0</copiers>
-    <pullerMaxPendingKiB">0</pullerMaxPendingKiB>
-    <hashers>0</hashers>
-    <autoDefrag="true" />
-    <sendOwnCert="true" />
-    <syncOwnershipReadOnly="false" />
-    <syncOwnership="true" />
-    <syncGroupReadOnly="false" />
-    <syncGroup="true" />
-  </folder>
-</configuration>
-EOF
+# Create directories on the host
+mkdir -p /opt/syncthing-agent/config
+mkdir -p /root/.openclaw/workspace/memory
+
+# Run the container
+docker run -d \
+  --name openclaw-wiki-sync \
+  --restart unless-stopped \
+  -p 8384:8384 \
+  -p 22000:22000/tcp \
+  -p 22000:22000/udp \
+  -p 21027:21027/udp \
+  -v /root/.openclaw/workspace/memory:/var/syncthing/memory \
+  -v /opt/syncthing-agent/config:/var/syncthing/config \
+  -e PUID=0 -e PGID=0 \
+  --memory=512m \
+  syncthing/syncthing:latest
 ```
 
-> **Note:** The Hub device ID (`REPLACED_BY_HUB`) will be added by the Hub administrator. You will receive this after contacting them with your Device ID.
+Then write the config with the container-internal path (same XML as above, but with `path="/var/syncthing/memory"` in the `<folder>` tag).
 
 ---
 
@@ -232,17 +212,20 @@ Send the Hub admin your:
 1. **Device ID** (from Step 3)
 2. **Hostname** (e.g. `punaioff-ROSITA`)
 
-They will add your device to the Hub and send you back the Hub's device ID to complete Step 5.
+They will add your device to the Hub config.
 
 ---
 
 ## Troubleshooting
 
-### Syncthing won't start — " insufficient disk space"
+### Syncthing won't start — "insufficient disk space"
 See Step 1. The disk is likely at 99%+. Expand it.
 
 ### Config.xml keeps resetting
 You edited it while Syncthing was running. Always stop first (Step 4).
+
+### Folder stuck at ~47% on Docker
+You're using the host path (`/root/.openclaw/workspace/memory`) instead of the container path (`/var/syncthing/memory`). See the Docker note in Step 5.
 
 ### Nothing syncing
 1. Check that your Device ID was added to the Hub
