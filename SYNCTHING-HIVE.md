@@ -395,3 +395,44 @@ systemctl start syncthing@root
 systemctl reset-failed syncthing@root
 systemctl start syncthing@root
 ```
+
+---
+
+## Additional Troubleshooting
+
+### Devices show "Disconnected"
+1. Both devices added to each other's config?
+2. Same folder ID `memory` on both?
+3. Firewall open on port 22000?
+4. Syncthing running on both?
+5. Can both hosts reach each other on port 22000? `nc -zv <hub-ip> 22000`
+
+### Malformed XML / weird tags like `<<`
+**Cause:** Used sed to inject device IDs into config.xml.
+**Fix:** Always write the complete config with `cat > config.xml << 'EOF'`. Never use sed on XML.
+
+### Sync stuck at ~47%
+**Cause:** Folder path mismatch in Docker setup (see "folder path missing" above).
+**Fix:** Fix the path, restart container.
+
+### Sync conflict files appearing
+**Cause:** Two agents modified the same file simultaneously.
+**Fix:** The `.stignore` from Step 6 prevents these from propagating. You can safely delete them:
+```bash
+find /root/.openclaw/workspace/memory/ -name "*.sync-conflict-*" -delete
+```
+
+### `.dreams/` folder showing up from other agents
+**Cause:** Agent recall/dream files that are specific to one agent.
+**Fix:** Already handled by `.stignore` (Step 6).
+
+---
+
+## The 6 Golden Rules
+
+1. **Never edit config.xml while Syncthing is running** — it overwrites on shutdown
+2. **Never use sed on XML** — use heredoc to write the whole file
+3. **Check disk space first** — 1% minimum or Syncthing refuses to start
+4. **Docker folder path = container path** — `/var/syncthing/memory`, NOT the host path
+5. **Enable the systemd service** — `systemctl enable syncthing@root`
+6. **Add `.stignore`** — prevents agent-specific junk from polluting the hive
