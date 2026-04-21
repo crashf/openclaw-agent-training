@@ -155,64 +155,121 @@ EOFXML
 > ⚠️ **CRITICAL:** The folder path MUST be `/var/syncthing/memory` — NOT `/root/.openclaw/workspace/memory`. Inside the container, the host directory is mounted at `/var/syncthing/memory`. If you use the host path, sync will fail with "folder path missing" and get stuck at ~47%. This is the #1 Docker gotcha.
 
 ```bash
-# Create directories on the host
-mkdir -p /opt/syncthing-agent/config
+docker stop openclaw-wiki-sync 2>/dev/null || true
+
+cat > /opt/syncthing-agent/config/config.xml << 'EOFXML'
+<configuration version="37">
+  <folder id="memory" label="Company Brain" path="/var/syncthing/memory" type="sendreceive" rescanIntervalS="3600" fsWatcherEnabled="true" fsWatcherDelayS="10" fsWatcherTimeoutS="0" ignorePerms="false" autoNormalize="true">
+    <filesystemType>basic</filesystemType>
+    <device id="YOUR_DEVICE_ID" introducedBy="">
+      <encryptionPassword></encryptionPassword>
+    </device>
+    <device id="HLBW742-2EYCQ7X-NC5MNKM-R4NBAMH-2XMBND4-G7MX7KX-QKBUMM7-DRDINAQ" introducedBy="">
+      <encryptionPassword></encryptionPassword>
+    </device>
+    <minDiskFree unit="%">1</minDiskFree>
+    <versioning>
+      <cleanupIntervalS>3600</cleanupIntervalS>
+      <fsPath></fsPath>
+      <fsType>basic</fsType>
+    </versioning>
+    <copiers>0</copiers>
+    <pullerMaxPendingKiB>0</pullerMaxPendingKiB>
+    <hashers>0</hashers>
+    <order>random</order>
+    <ignoreDelete>false</ignoreDelete>
+    <scanProgressIntervalS>0</scanProgressIntervalS>
+    <pullerPauseS>0</pullerPauseS>
+    <maxConflicts>10</maxConflicts>
+    <disableSparseFiles>false</disableSparseFiles>
+    <paused>false</paused>
+    <markerName>.stfolder</markerName>
+  </folder>
+  <device id="YOUR_DEVICE_ID" name="YOUR_HOSTNAME" compression="metadata" introducer="false" skipIntroductionRemovals="false" introducedBy="">
+    <address>dynamic</address>
+    <paused>false</paused>
+    <autoAcceptFolders>false</autoAcceptFolders>
+  </device>
+  <device id="HLBW742-2EYCQ7X-NC5MNKM-R4NBAMH-2XMBND4-G7MX7KX-QKBUMM7-DRDINAQ" name="hino-wiki-sync" compression="metadata" introducer="false" skipIntroductionRemovals="false" introducedBy="">
+    <address>dynamic</address>
+    <paused>false</paused>
+    <autoAcceptFolders>false</autoAcceptFolders>
+  </device>
+  <gui enabled="true" tls="false" debugging="false" sendBasicAuthPrompt="false">
+    <address>0.0.0.0:8384</address>
+    <theme>default</theme>
+  </gui>
+  <options>
+    <listenAddress>default</listenAddress>
+    <globalAnnounceEnabled>true</globalAnnounceEnabled>
+    <localAnnounceEnabled>true</localAnnounceEnabled>
+    <relaysEnabled>true</relaysEnabled>
+  </options>
+</configuration>
+EOFXML
+
+docker start openclaw-wiki-sync
+```
+
+> **Note:** Docker GUI binds to `0.0.0.0:8384` (accessible externally) while native binds to `127.0.0.1:8384` (localhost only).
+
+---
+
+## Step 6: Create .stignore
+
+This prevents agent-specific and junk files from syncing to other agents:
+
+```bash
 mkdir -p /root/.openclaw/workspace/memory
 
-# Run the container
-docker run -d \
-  --name openclaw-wiki-sync \
-  --restart unless-stopped \
-  -p 8384:8384 \
-  -p 22000:22000/tcp \
-  -p 22000:22000/udp \
-  -p 21027:21027/udp \
-  -v /root/.openclaw/workspace/memory:/var/syncthing/memory \
-  -v /opt/syncthing-agent/config:/var/syncthing/config \
-  -e PUID=0 -e PGID=0 \
-  --memory=512m \
-  syncthing/syncthing:latest
-```
+cat > /root/.openclaw/workspace/memory/.stignore << 'EOF'
+// Agent-specific recall files — each agent has its own
+.dreams
 
-Then write the config with the container-internal path (same XML as above, but with `path="/var/syncthing/memory"` in the `<folder>` tag).
-
----
-
-## Step 6: Start Syncthing
-
-```bash
-# Native:
-systemctl enable --now syncthing@root
-
-# Docker:
-systemctl enable --now syncthing
+// Sync conflict files — don't propagate conflicts
+*.sync-conflict-*
+EOF
 ```
 
 ---
 
-## Step 7: Verify It's Working
+## Step 7: Start Syncthing & Enable Boot Persistence
 
-Check the Syncthing Web UI:
+### Native:
 
 ```bash
-curl -s http://127.0.0.1:8384 | head -5
+systemctl enable syncthing@root
+systemctl start syncthing@root
+systemctl status syncthing@root
 ```
 
-Or check the journal:
+### Docker:
+
+Already running from Step 5 (`docker start`). Verify:
 
 ```bash
-journalctl -u syncthing@root -n 20 --no-pager
+docker ps | grep openclaw-wiki-sync
 ```
 
 ---
 
-## Step 8: Contact the Hub Admin
+## Step 8: Register on the Hub
 
-Send the Hub admin your:
-1. **Device ID** (from Step 3)
-2. **Hostname** (e.g. `punaioff-ROSITA`)
+Your agent won't sync until the Hub knows about you. Send your Device ID (from Step 3) to whoever manages the Hub. They need to do one of these:
 
-They will add your device to the Hub config.
+### Option A: Hub Web UI (easiest)
+
+1. Open http://170.205.18.11:8384
+2. Click **Add Remote Device**
+3. Paste your Device ID
+4. Under **Shared Folders**, check the `memory` folder
+5. Save
+
+### Option B: Hub API (automated)
+
+```bash
+# TBD — Hub admin may expose an API endpoint for auto-registration
+```
 
 ---
 
