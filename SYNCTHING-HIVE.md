@@ -9,6 +9,7 @@ You are joining the Pund-IT Company Brain — a shared memory system that syncs 
 ## What You Need to Know
 
 - **Hub** is the central sync relay at `170.205.18.11` (device ID: `HLBW742-2EYCQ7X-NC5MNKM-R4NBAMH-2XMBND4-G7MX7KX-QKBUMM7-DRDINAQ`, name: `hino-wiki-sync`)
+- **Hub API Key:** `hLjecHTSiKDcw9qpCiT6VNL6vZsF7oC6`
 - **Folder ID** is `memory` — all agents use this exact ID
 - **Your sync path** is `/root/.openclaw/workspace/memory/` (native) or `/var/syncthing/memory` (Docker)
 - **Shared knowledge** lives in `memory/synthesis/`, `memory/index.md`, `memory/log.md`, and daily notes
@@ -70,7 +71,7 @@ mkdir -p /root/.openclaw/workspace/memory
 syncthing -generate ~/.config/syncthing
 ```
 
-Now get your **Device ID** — you'll need it for Step 5:
+Now get your **Device ID** — you'll need it for Steps 5 and 8:
 
 ```bash
 grep -oP 'device id="\K[^"]+' ~/.config/syncthing/config.xml | head -1
@@ -255,7 +256,7 @@ docker ps | grep openclaw-wiki-sync
 
 ## Step 8: Register on the Hub
 
-Your agent won't sync until the Hub knows about you. Send your Device ID (from Step 3) to whoever manages the Hub. They need to do one of these:
+Your agent won't sync until the Hub knows about you. Send your Device ID (from Step 3) to whoever manages the Hub.
 
 ### Option A: Hub Web UI (easiest)
 
@@ -267,32 +268,130 @@ Your agent won't sync until the Hub knows about you. Send your Device ID (from S
 
 ### Option B: Hub API (automated)
 
+Run this on the Hub host (`170.205.18.11`). Replace `NEW_DEVICE_ID` with your agent's Device ID and `NEW_HOSTNAME` with your hostname.
+
 ```bash
-# TBD — Hub admin may expose an API endpoint for auto-registration
+# Add the device
+curl -s -X POST http://localhost:8384/rest/config/devices \
+  -H 'X-API-Key: hLjecHTSiKDcw9qpCiT6VNL6vZsF7oC6' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "deviceID": "NEW_DEVICE_ID",
+    "name": "NEW_HOSTNAME",
+    "addresses": ["dynamic"],
+    "compression": "metadata",
+    "introducer": false,
+    "autoAcceptFolders": false
+  }'
+
+# Add the device to the memory folder
+curl -s http://localhost:8384/rest/config/folders/memory \
+  -H 'X-API-Key: hLjecHTSiKDcw9qpCiT6VNL6vZsF7oC6' > /tmp/folder.json
+
+python3 -c "
+import json
+with open('/tmp/folder.json') as f:
+    data = json.load(f)
+data['devices'].append({'deviceID': 'NEW_DEVICE_ID', 'introducedBy': ''})
+with open('/tmp/folder.json', 'w') as f:
+    json.dump(data, f)
+"
+
+curl -s -X PUT http://localhost:8384/rest/config/folders/memory \
+  -H 'X-API-Key: hLjecHTSiKDcw9qpCiT6VNL6vZsF7oC6' \
+  -H 'Content-Type: application/json' \
+  -d @/tmp/folder.json
 ```
 
 ---
 
-## Troubleshooting
+## Step 9: Verify Sync Is Working
 
-### Syncthing won't start — "insufficient disk space"
-See Step 1. The disk is likely at 99%+. Expand it.
+Wait 30-60 seconds after the Hub accepts your device, then check:
 
-### Config.xml keeps resetting
-You edited it while Syncthing was running. Always stop first (Step 4).
-
-### Folder stuck at ~47% on Docker
-You're using the host path (`/root/.openclaw/workspace/memory`) instead of the container path (`/var/syncthing/memory`). See the Docker note in Step 5.
-
-### Nothing syncing
-1. Check that your Device ID was added to the Hub
-2. Verify the folder ID is exactly `memory` (case-sensitive)
-3. Check `journalctl -u syncthing@root -n 50` for errors
-4. Confirm your path matches: `/root/.openclaw/workspace/memory/` (native) or `/var/syncthing/memory` (Docker)
-
-### Permission denied errors
-Make sure the `memory/` directory exists and Syncthing has read/write access:
 ```bash
-mkdir -p /root/.openclaw/workspace/memory
-chmod 755 /root/.openclaw/workspace/memory
+# Get your API key from config
+API_KEY=$(grep -oP '<apikey>\K[^<]+' ~/.config/syncthing/config.xml 2>/dev/null || \
+  docker exec openclaw-wiki-sync cat /var/syncthing/config/config.xml 2>/dev/null | \
+  grep -oP '<apikey>\K[^<]+')
+
+# Check connections — you should see HLBW742 (Hub) as connected=true
+curl -s http://localhost:8384/rest/system/connections \
+  -H "X-API-Key: $API_KEY" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for dev_id, info in data.get('connections', {}).items():
+    print(f'{dev_id[:20]}... connected={info.get(\"connected\", False)}')
+"
+
+# Check folder status — state should be \"idle\", not \"scanning\" or \"error\"
+curl -s "http://localhost:8384/rest/db/status?folder=memory" \
+  -H "X-API-Key: $API_KEY" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+print(f'State: {data.get(\"state\", \"?\")}')
+print(f'Local files: {data.get(\"localFiles\", \"?\")}')
+print(f'Global files: {data.get(\"globalFiles\", \"?\")}')
+if data.get('need'):
+    print(f'Still syncing: {data[\"need\"].get(\"files\", 0)} files remaining')
+"
+```
+
+**Expected output:**
+```
+HLBW742-2EYCQ7X-NC5M... connected=True
+State: idle
+Local files: 227
+Global files: 227
+```
+
+If `connected=False`, check:
+- **Firewall:** ports 22000/tcp, 22000/udp, 21027/udp must be open
+- **Hub:** Is your device ID registered? (Step 8)
+- **Both sides:** Do both configs have each other's device ID?
+
+---
+
+## Step 10: Add Memory Sync Cron
+
+So your agent periodically picks up new memories from other agents:
+
+```bash
+openclaw cron add \
+  --name "memory-sync-check" \
+  --cron "*/30 * * * *" \
+  --message "Check memory/ for files modified in last 30 minutes. Run memory_search for recent topics. If significant new content found from other agents (via Syncthing sync), read and incorporate into your current session context. Focus on: new synthesis pages, daily notes, and log entries from other agents."
+```
+
+---
+
+## Troubleshooting Reference
+
+### "insufficient space on disk for database"
+**Cause:** Less than 1% free disk space.
+**Fix:** Expand disk BEFORE deploying. See Step 1.
+
+### "folder path missing" (Docker only)
+**Cause:** Config has host path `/root/.openclaw/workspace/memory` but container sees `/var/syncthing/memory`.
+**Fix:** Change `<folder path="/var/syncthing/memory">` in config. This is the #1 Docker mistake.
+
+### "CSRF Token Invalid" on API calls
+**Cause:** Syncthing's web UI auth blocks REST API.
+**Fix:** Edit config.xml directly. Never use the API for initial setup.
+
+### "Failed to acquire lock: is another Syncthing instance already running?"
+**Cause:** Orphan Syncthing process holding the lock file.
+**Fix:**
+```bash
+pkill -9 syncthing
+systemctl reset-failed syncthing@root
+systemctl start syncthing@root
+```
+
+### "Start request repeated too quickly"
+**Cause:** systemd marked the service as failed after too many restart attempts.
+**Fix:**
+```bash
+systemctl reset-failed syncthing@root
+systemctl start syncthing@root
 ```
