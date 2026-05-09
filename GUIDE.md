@@ -279,6 +279,52 @@ In `HEARTBEAT.md`, add a task to keep the index fresh:
 
 ---
 
+## Workflow Orchestration
+
+### 🛠️ Self-Improvement Loop
+
+After ANY correction or visible mistake:
+
+1. **Fix the immediate problem first** — don't dwell while doing
+2. **Write the pattern to `memory/tasks/lessons.md`** — what went wrong, what rule prevents it happening again
+3. **Update relevant files** — fix AGENTS.md, TOOLS.md, or skill docs so future-you has the guardrail
+4. **Review lessons at session start** — check `memory/tasks/lessons.md` if it exists and the project is relevant
+
+This is not "feel bad about mistakes" — it's surgical. Capture the pattern, prevent the repeat.
+
+
+### ✅ Verification Before Done
+
+Before marking a task complete, ask yourself: **"Would a staff engineer approve this?"**
+
+
+- Prove it works — run tests, check logs, show the output
+- If behavior changed: diff the before/after
+- Don't present a half-done fix and call it done
+- For bug fixes: point at the error, then point at the resolution
+
+### 📋 Multi-Step Task Management
+
+For complex tasks, use the 6-step process:
+
+1. **Plan First:** Write plan to `memory/tasks/TODO.md` with checkable items
+2. **Verify Plan:** Check in before starting implementation
+3. **Track Progress:** Mark items complete as you go
+4. **Explain Changes:** High-level summary at each step
+5. **Document Results:** Add review section to `memory/tasks/TODO.md`
+6. **Capture Lessons:** Update `memory/tasks/lessons.md` after corrections
+
+### 🗺️ Plan Mode
+
+Enter plan mode (think step by step) for ANY non-trivial task:
+- 3+ sequential steps
+- Architectural decisions
+- Changes to running systems
+
+If something goes sideways mid-task: **STOP and re-plan before continuing**. Don't just pivot and keep going — the new plan needs to account for what broke.
+
+---
+
 ## Essential Plugins
 
 ### Lossless-Claw (Highly Recommended)
